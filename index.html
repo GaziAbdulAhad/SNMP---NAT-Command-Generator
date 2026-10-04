@@ -122,6 +122,15 @@ h1 span{color:var(--cyan);}
   background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.3);
   padding:2px 6px; border-radius:4px;
 }
+.field.bdcom{position:relative;}
+.field.bdcom input{color:#ff9ed8;}
+.field.bdcom label .grp{color:#ff9ed8; opacity:.75;}
+.field.bdcom::after{
+  content:"BDCOM ONLY"; position:absolute; top:-1px; right:0;
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.08em; color:#ff9ed8;
+  background:rgba(255,158,216,0.1); border:1px solid rgba(255,158,216,0.3);
+  padding:2px 6px; border-radius:4px;
+}
 .panel-foot{margin-top:16px; font-size:12px; color:var(--muted-2); display:flex; align-items:center; gap:8px;}
 .panel-foot svg{width:13px; height:13px; flex-shrink:0;}
 
@@ -163,6 +172,7 @@ pre .val{color:var(--cyan); font-weight:500;}
 pre .ip{color:var(--violet); font-weight:500;}
 pre .nat{color:var(--amber); font-weight:500;}
 pre .cread{color:var(--green); font-weight:500;}
+pre .bdesc{color:#ff9ed8; font-weight:500;}
 .card-note{padding:11px 20px 16px; font-size:12.5px; color:var(--muted); border-top:1px dashed var(--line-soft);}
 .card-note b{color:var(--muted-2)}
 
@@ -289,10 +299,14 @@ footer{margin-top:64px; padding-top:22px; border-top:1px solid var(--line-soft);
         <label>Cdata Read Community <span class="grp">· শুধু Cdata কার্ডে প্রযোজ্য</span></label>
         <input type="text" id="cdataReadComm" value="sreebordi">
       </div>
+      <div class="field bdcom">
+        <label>BDCOM Description <span class="grp">· শুধু BDCOM কার্ডে প্রযোজ্য</span></label>
+        <input type="text" id="bdcomDesc" value="Saidul-SNMP">
+      </div>
     </div>
     <div class="panel-foot">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-      <span><span style="color:var(--cyan)">cyan</span> = SNMP ভ্যালু &nbsp;·&nbsp; <span style="color:var(--violet)">violet</span> = IP &nbsp;·&nbsp; <span style="color:var(--amber)">amber</span> = NAT/port ভ্যালু &nbsp;·&nbsp; <span style="color:var(--green)">green</span> = Cdata-only ভ্যালু</span>
+      <span><span style="color:var(--cyan)">cyan</span> = SNMP ভ্যালু &nbsp;·&nbsp; <span style="color:var(--violet)">violet</span> = IP &nbsp;·&nbsp; <span style="color:var(--amber)">amber</span> = NAT/port ভ্যালু &nbsp;·&nbsp; <span style="color:var(--green)">green</span> = Cdata-only &nbsp;·&nbsp; <span style="color:#ff9ed8">pink</span> = BDCOM-only</span>
     </div>
   </div>
 
@@ -355,11 +369,10 @@ snmp-server host <span class="ip">${host}</span> version 2c community <span clas
     note:'RW কমিউনিটি সরাসরি হোস্টের সাথে বাইন্ড করা — v2c।' },
 
   { id:"bdcom", name:"BDCOM", tag:"SNMP",
-    build:(host,comm)=>
+    build:(host,comm,cdataRead,bdcomDesc)=>
 `snmp-server community 0 <span class="val">${comm}</span> RO
-snmp-server host <span class="ip">${host}</span> description Saidul-SNMP udp-port 161 version v2c <span class="val">${comm}</span>
-authentication configure snmp`,
-    note:'RO কমিউনিটি + কাস্টম description ট্যাগ (Saidul-SNMP)।' },
+snmp-server host <span class="ip">${host}</span> description <span class="bdesc">${bdcomDesc}</span> udp-port 161 version v2c <span class="val">${comm}</span> authentication configure snmp`,
+    note:'পুরোটা <b>একটাই লাইন/কমান্ড</b> — "authentication configure snmp" এটা snmp-server host কমান্ডের অংশ, আলাদা কমান্ড না। description ("<span id="bdcom-desc-note">Saidul-SNMP</span>") উপরের "BDCOM Description" ফিল্ড থেকে আসছে, শুধু এই কার্ডে প্রযোজ্য।' },
 
   { id:"corelink", name:"Corelink", tag:"SNMP + TRAPS",
     build:(host,comm)=>
@@ -433,13 +446,17 @@ function updateCommands(){
   const tcp  = el('tcpPort').value.trim() || '<TCP_PORT>';
   const udp  = el('udpPort').value.trim() || '<UDP_PORT>';
   const cdataRead = el('cdataReadComm').value.trim() || '<CDATA_READ>';
+  const bdcomDesc = el('bdcomDesc').value.trim() || '<BDCOM_DESC>';
 
   VENDORS.forEach(v=>{
-    el('code-'+v.id).innerHTML = v.build(host, comm, cdataRead);
+    el('code-'+v.id).innerHTML = v.build(host, comm, cdataRead, bdcomDesc);
   });
 
   const cdataNoteSpan = el('cdata-read-note');
   if(cdataNoteSpan) cdataNoteSpan.textContent = cdataRead;
+
+  const bdcomNoteSpan = el('bdcom-desc-note');
+  if(bdcomNoteSpan) bdcomNoteSpan.textContent = bdcomDesc;
 
   el('topo-host-label').textContent = host;
 
@@ -456,7 +473,7 @@ add action=dst-nat chain=dstnat dst-address=<span class="nat">${dst}</span> dst-
   el('mikrotik-note').innerHTML = `<b>Note:</b> TCP ${tcp} → Telnet (port 23), UDP ${udp} → SNMP (port 161), উভয়ই <span style="color:var(--violet)">${toA}</span>-এ ফরওয়ার্ড হচ্ছে external <span style="color:var(--violet)">${dst}</span> থেকে।`;
 }
 
-['hostIp','communityName','dstAddr','toAddr','tcpPort','udpPort','cdataReadComm'].forEach(id=>{
+['hostIp','communityName','dstAddr','toAddr','tcpPort','udpPort','cdataReadComm','bdcomDesc'].forEach(id=>{
   el(id).addEventListener('input', updateCommands);
 });
 
